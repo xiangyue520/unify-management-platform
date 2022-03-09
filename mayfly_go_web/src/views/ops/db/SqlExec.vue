@@ -625,7 +625,7 @@ export default defineComponent({
             const sortType = sort.order == 'descending' ? 'DESC' : 'ASC';
 
             state.dataTabs[state.activeName].querySql = getDefaultSelectSql(tableName, '', `ORDER BY \`${sort.prop}\` ${sortType}`);
-
+            state.dataTabs[tableName].execRes.data = []; // 清空列表，防止修改的数据渲染错误
             onRefresh(tableName);
         };
 
