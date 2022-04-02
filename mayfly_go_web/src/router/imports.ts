@@ -18,4 +18,5 @@ export const imports = {
     // redis
     "RedisList": () => import('@/views/ops/redis'),
     "DataOperation": () => import('@/views/ops/redis/DataOperation.vue'),
+    "DocList": () => import('@/views/doc/DocList.vue')
 }

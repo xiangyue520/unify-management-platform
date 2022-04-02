@@ -15,6 +15,8 @@ server:
   static:
     - relative-path: /assets
       root: ./static/assets
+    - relative-path: /files/doc
+      root: ./files/doc
   # 静态文件
   static-file:
     - relative-path: /
