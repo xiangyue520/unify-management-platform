@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"mayfly-go/base/config"
 	"mayfly-go/base/middleware"
+	"mayfly-go/base/model"
 	common_index_router "mayfly-go/server/common/router"
 	devops_router "mayfly-go/server/devops/router"
+	"mayfly-go/server/sys/domain/entity"
 	sys_router "mayfly-go/server/sys/router"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +26,33 @@ func InitRouter() *gin.Engine {
 
 	// 没有路由即 404返回
 	router.NoRoute(func(g *gin.Context) {
-		g.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": fmt.Sprintf("not found '%s:%s'", g.Request.Method, g.Request.URL.Path)})
+		defer func() {
+			if err := recover(); err != nil {
+				g.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": fmt.Sprintf("请求出错 '%s'", err)})
+			}
+		}()
+		method := g.Request.Method
+		path := g.Request.URL.Path
+		// 查找是否配置了该路径的mock数据，存在则直接返回mock数据
+		mockData := &entity.MockData{}
+		mockData.Path = path
+		mockData.Method = method
+		err := model.GetBy(mockData)
+		if err != nil || mockData.Status == -1 {
+			if mockData.RealUrl != "" {
+				reqUrl := g.Request.URL
+				realUrl, _ := url.ParseRequestURI(mockData.RealUrl)
+				realUrl.Path = reqUrl.Path
+				realUrl.RawQuery = reqUrl.RawQuery
+
+				httputil.NewSingleHostReverseProxy(realUrl).ServeHTTP(g.Writer, g.Request)
+				return
+			}
+			g.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": fmt.Sprintf("not found '%s:%s'", method, path)})
+			return
+		}
+
+		g.JSON(http.StatusOK, mockData.Data)
 	})
 
 	// 设置静态资源
@@ -53,6 +83,7 @@ func InitRouter() *gin.Engine {
 		sys_router.InitResourceRouter(api)
 		sys_router.InitRoleRouter(api)
 		sys_router.InitSystemRouter(api)
+		sys_router.InitMockRouter(api)
 
 		devops_router.InitProjectRouter(api)
 		devops_router.InitDbRouter(api)

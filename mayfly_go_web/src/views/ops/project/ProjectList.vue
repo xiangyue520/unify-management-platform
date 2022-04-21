@@ -62,7 +62,7 @@
 
         <el-dialog width="400px" title="项目编辑" :before-close="cancelAddProject" v-model="addProjectDialog.visible">
             <el-form :model="addProjectDialog.form" label-width="70px">
-                <el-form-item label="项目名:" required>
+                <el-form-item label="项目名:" required prop="name">
                     <el-input :disabled="addProjectDialog.form.id ? true : false" v-model="addProjectDialog.form.name" auto-complete="off"></el-input>
                 </el-form-item>
                 <el-form-item label="描述:">
