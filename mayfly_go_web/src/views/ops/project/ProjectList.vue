@@ -94,7 +94,7 @@
 
             <el-dialog width="400px" title="添加环境" :before-close="cancelAddEnv" v-model="showEnvDialog.addVisible">
                 <el-form :model="showEnvDialog.envForm" label-width="70px">
-                    <el-form-item label="环境名:" required>
+                    <el-form-item prop="name" label="环境名:" required>
                         <el-input v-model="showEnvDialog.envForm.name" auto-complete="off"></el-input>
                     </el-form-item>
                     <el-form-item label="描述:">
