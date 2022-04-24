@@ -1,5 +1,9 @@
 <template>
     <div>
+        <el-button-group :style="btnStyle">
+            <el-button @click="onRunSql" type="success" icon="video-play" size="small" plain>执行</el-button>
+            <el-button @click="formatSql" type="primary" icon="magic-stick" size="small" plain>格式化</el-button>
+        </el-button-group>
         <div class="toolbar">
             <el-row type="flex" justify="space-between">
                 <el-col :span="24">
@@ -17,7 +21,7 @@
                             </el-form-item>
 
                             <el-form-item label-width="40" label="表">
-                                <el-select v-model="tableName" placeholder="选择表查看表数据" @change="changeTable" filterable style="width: 250px">
+                                <el-select v-model="tableName" placeholder="选择表查看表数据" @change="changeTable" filterable style="width: 300px">
                                     <el-option
                                         v-for="item in tableMetadata"
                                         :key="item.tableName"
@@ -82,22 +86,8 @@
                             </div>
                         </div>
 
-                        <div class="mt5">
-                            <codemirror
-                                style="border: 1px solid #ccc"
-                                @mousemove="listenMouse"
-                                @beforeChange="onBeforeChange"
-                                height="300px"
-                                class="codesql"
-                                ref="cmEditor"
-                                language="sql"
-                                v-model="sql"
-                                :options="cmOptions"
-                            />
-                            <el-button-group :style="btnStyle">
-                                <el-button @click="onRunSql" type="success" icon="video-play" size="small" plain>执行</el-button>
-                                <el-button @click="formatSql" type="primary" icon="magic-stick" size="small" plain>格式化</el-button>
-                            </el-button-group>
+                        <div @click="closeExecBtns" class="mt5 sqlEditor" @contextmenu="showExecBtns">
+                            <textarea ref="codeTextarea"></textarea>
                         </div>
 
                         <div class="mt5">
@@ -149,8 +139,29 @@
                         </el-tooltip>
                     </el-row>
                     <el-row class="mt5">
-                        <el-input v-model="dt.condition" placeholder="若需条件过滤，输入WHERE之后查询条件点击查询按钮即可" clearable size="small">
+                        <el-input v-model="dt.condition" placeholder="若需条件过滤，可选择列并点击对应的字段并输入需要过滤的内容点击查询按钮即可" clearable size="small">
                             <template #prepend>
+                                <el-popover trigger="click" :width="270" placement="right">
+                                    <template #reference>
+                                        <el-link type="success" :underline="false">选择列</el-link>
+                                    </template>
+                                    <el-table
+                                        :data="getColumns4Map(dt.name)"
+                                        max-height="500"
+                                        size="small"
+                                        @row-click="
+                                            (...event) => {
+                                                onConditionRowClick(event, dt);
+                                            }
+                                        "
+                                    >
+                                        <el-table-column property="columnName" label="列名" show-overflow-tooltip> </el-table-column>
+                                        <el-table-column property="columnComment" label="备注" show-overflow-tooltip> </el-table-column>
+                                    </el-table>
+                                </el-popover>
+                            </template>
+
+                            <template #append>
                                 <el-button @click="selectByCondition(dt.name, dt.condition)" icon="search" size="small"></el-button>
                             </template>
                         </el-input>
@@ -161,7 +172,7 @@
                         @selection-change="onDataSelectionChange"
                         :data="dt.execRes.data"
                         size="small"
-                        max-height="600"
+                        :max-height="dataTabsTableHeight"
                         v-loading="dt.loading"
                         element-loading-text="查询中..."
                         empty-text="暂无数据"
@@ -197,9 +208,8 @@
 </template>
 
 <script lang="ts">
-import { toRefs, reactive, computed, defineComponent, ref } from 'vue';
+import { onMounted, toRefs, reactive, defineComponent, ref } from 'vue';
 import { dbApi } from './api';
-import _ from 'lodash';
 
 import 'codemirror/addon/hint/show-hint.css';
 // import base style
@@ -208,7 +218,7 @@ import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/base16-light.css';
 
 import 'codemirror/addon/selection/active-line';
-import { codemirror } from '@/components/codemirror';
+import _CodeMirror from 'codemirror';
 // import 'codemirror/mode/sql/sql.js';
 import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
@@ -224,12 +234,13 @@ import SqlExecBox from './component/SqlExecBox';
 export default defineComponent({
     name: 'SqlExec',
     components: {
-        codemirror,
         ProjectEnvSelect,
     },
     setup() {
-        const cmEditor: any = ref(null);
+        const codeTextarea: any = ref(null);
         const token = getSession('token');
+        let codemirror = null as any;
+        const tableMap = new Map();
 
         const state = reactive({
             token: token,
@@ -242,11 +253,11 @@ export default defineComponent({
             columnMetadata: [],
             sqlName: '', // 当前sql模板名
             sqlNames: [], // 所有sql模板名
-            sql: '',
             activeName: 'Query',
             queryTabName: 'Query',
             nowTableName: '', // 当前表格数据操作的数据库表名，用于双击编辑表内容使用
             dataTabs: {}, // 点击表信息后执行结果数据展示tabs
+            dataTabsTableHeight: 600,
             // 查询tab
             queryTab: {
                 label: '查询',
@@ -292,11 +303,40 @@ export default defineComponent({
             },
         });
 
-        const tableMap = new Map();
+        const initCodemirror = () => {
+            // 初始化编辑器实例，传入需要被实例化的文本域对象和默认配置
+            codemirror = _CodeMirror.fromTextArea(codeTextarea.value, state.cmOptions);
+            codemirror.on('inputRead', (instance: any, changeObj: any) => {
+                if (/^[a-zA-Z]/.test(changeObj.text[0])) {
+                    instance.showHint();
+                }
+            });
 
-        const codemirror: any = computed(() => {
-            return cmEditor.value.coder;
+            codemirror.on('beforeChange', (instance: any, changeObj: any) => {
+                var text = changeObj.text[0];
+                // 将sql提示去除
+                changeObj.text[0] = text.split('  ')[0];
+            });
+        };
+
+        onMounted(() => {
+            initCodemirror();
+            setHeight();
+            // 监听浏览器窗口大小变化,更新对应组件高度
+            window.onresize = () =>
+                (() => {
+                    setHeight();
+                })();
         });
+
+        /**
+         * 设置codemirror高度和数据表高度
+         */
+        const setHeight = () => {
+            // 默认300px
+            codemirror.setSize('auto', `${window.innerHeight - 538}px`);
+            state.dataTabsTableHeight = window.innerHeight - 258;
+        };
 
         /**
          * 项目及环境更改后的回调事件
@@ -308,15 +348,6 @@ export default defineComponent({
             if (envId != null) {
                 state.params.envId = envId;
                 search();
-            }
-        };
-
-        /**
-         * 输入字符给提示
-         */
-        const inputRead = (instance: any, changeObj: any) => {
-            if (/^[a-zA-Z]/.test(changeObj.text[0])) {
-                showHint();
             }
         };
 
@@ -333,7 +364,7 @@ export default defineComponent({
             notBlank(state.dbId, '请先选择数据库');
             // 没有选中的文本，则为全部文本
             let sql = getSql();
-            notBlank(sql.trim(), 'sql内容不能为空');
+            isTrue(sql && sql.trim(), '请选中需要执行的sql');
 
             state.queryTab.loading = true;
             // 即只有以该字符串开头的sql才可修改表数据内容
@@ -353,10 +384,15 @@ export default defineComponent({
                 state.nowTableName = '';
             }
 
-            const colAndData: any = await runSql(sql);
-            state.queryTab.execRes.data = colAndData.res;
-            state.queryTab.execRes.tableColumn = colAndData.colNames;
-            state.queryTab.loading = false;
+            try {
+                const colAndData: any = await runSql(sql);
+                state.queryTab.execRes.data = colAndData.res;
+                state.queryTab.execRes.tableColumn = colAndData.colNames;
+                state.queryTab.loading = false;
+            } catch (e: any) {
+                state.queryTab.loading = false;
+            }
+            closeExecBtns();
         };
 
         /**
@@ -393,6 +429,8 @@ export default defineComponent({
             const name = tab.props.name;
             // 不是查询tab，则为表数据tab，同时赋值当前表名，用于在线修改表数据等
             if (name != state.queryTab.name) {
+                // 修改选择框绑定的表信息
+                state.tableName = name;
                 state.nowTableName = name;
             } else {
                 state.nowTableName = state.queryTab.nowTableName;
@@ -481,7 +519,7 @@ export default defineComponent({
 
         const getColumnTip = (tableName: string, columnName: string) => {
             // 优先从 table map中获取
-            let columns = tableMap.get(tableName);
+            let columns = getColumns4Map(tableName);
             if (!columns) {
                 return '';
             }
@@ -495,9 +533,9 @@ export default defineComponent({
          */
         const getSql = () => {
             // 没有选中的文本，则为全部文本
-            let selectSql = codemirror.value.getSelection();
-            if (selectSql == '') {
-                selectSql = state.sql;
+            let selectSql = codemirror.getSelection();
+            if (!selectSql) {
+                selectSql = getCodermirrorValue();
             }
             return selectSql;
         };
@@ -587,7 +625,7 @@ export default defineComponent({
          */
         const getColumns = async (tableName: string) => {
             // 优先从 table map中获取
-            let columns = tableMap.get(tableName);
+            let columns = getColumns4Map(tableName);
             if (columns) {
                 return columns;
             }
@@ -597,6 +635,35 @@ export default defineComponent({
             });
             tableMap.set(tableName, columns);
             return columns;
+        };
+
+        // 从缓存map获取列信息
+        const getColumns4Map = (tableName: string) => {
+            return tableMap.get(tableName);
+        };
+
+        /**
+         * 条件查询，点击列信息后显示输入对应的值
+         */
+        const onConditionRowClick = (event: any, dataTab: any) => {
+            const row = event[0];
+            ElMessageBox.prompt(`请输入 [${row.columnName}] 的值`, '查询条件', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                inputPlaceholder: `${row.columnType}  ${row.columnComment}`,
+            })
+                .then(({ value }) => {
+                    if (!value) {
+                        value = '';
+                    }
+                    let condition = dataTab.condition;
+                    if (condition) {
+                        condition += ` AND `;
+                    }
+                    condition += `${row.columnName} = `;
+                    dataTab.condition = condition + wrapColumnValue(row, value);
+                })
+                .catch(() => {});
         };
 
         const onRefresh = async (tableName: string) => {
@@ -644,11 +711,19 @@ export default defineComponent({
             notBlank(state.dbId, '请先选择数据库');
             dbApi.getSql.request({ id: state.dbId, type: 1, name: state.sqlName }).then((res) => {
                 if (res) {
-                    state.sql = res.sql;
+                    setCodermirrorValue(res.sql);
                 } else {
-                    state.sql = '';
+                    setCodermirrorValue('');
                 }
             });
+        };
+
+        const setCodermirrorValue = (value: string) => {
+            codemirror.setValue(value);
+        };
+
+        const getCodermirrorValue = () => {
+            codemirror.getValue();
         };
 
         /**
@@ -673,9 +748,10 @@ export default defineComponent({
         };
 
         const saveSql = async () => {
-            notEmpty(state.sql, 'sql内容不能为空');
+            const sql = codemirror.getValue();
+            notEmpty(sql, 'sql内容不能为空');
             notBlank(state.dbId, '请先选择数据库');
-            await dbApi.saveSql.request({ id: state.dbId, sql: state.sql, type: 1, name: state.sqlName });
+            await dbApi.saveSql.request({ id: state.dbId, sql: sql, type: 1, name: state.sqlName });
             ElMessage.success('保存成功');
 
             dbApi.getSqlNames
@@ -710,7 +786,7 @@ export default defineComponent({
             state.tableMetadata = [];
             state.columnMetadata = [];
             state.dataTabs = {};
-            state.sql = '';
+            setCodermirrorValue('');
             state.sqlNames = [];
             state.sqlName = '';
             state.activeName = state.queryTab.name;
@@ -718,6 +794,7 @@ export default defineComponent({
             state.queryTab.execRes.tableColumn = [];
             state.cmOptions.hintOptions.tables = [];
             tableMap.clear();
+            closeExecBtns();
         };
 
         const onDataSelectionChange = (datas: []) => {
@@ -856,24 +933,13 @@ export default defineComponent({
         };
 
         /**
-         * 自动提示功能
-         */
-        const showHint = () => {
-            codemirror.value.showHint();
-        };
-
-        /**
          * 格式化sql
          */
         const formatSql = () => {
-            let selectSql = codemirror.value.getSelection();
-            // 有选中sql则只格式化选中部分，否则格式化全部
-            if (selectSql != '') {
-                codemirror.value.replaceSelection(sqlFormatter(selectSql));
-            } else {
-                /* 将sql内容进行格式后放入编辑器中*/
-                state.sql = sqlFormatter(state.sql);
-            }
+            let selectSql = codemirror.getSelection();
+            isTrue(selectSql, '请选中需要格式化的sql');
+            codemirror.replaceSelection(sqlFormatter(selectSql));
+            closeExecBtns();
         };
 
         const search = async () => {
@@ -882,32 +948,34 @@ export default defineComponent({
         };
 
         /**
-         * 获取选择文字，显示隐藏按钮，防抖
+         * 显示执行sql和格式化按钮
          */
-        const getSelection = _.debounce((e: any) => {
-            let temp = codemirror.value.getSelection();
-            if (temp) {
-                state.btnStyle.display = 'block';
-                if (!state.btnStyle.left) {
-                    state.btnStyle.left = e.target.getBoundingClientRect().left;
-                    state.btnStyle.top = e.target.getBoundingClientRect().top - 160 + 'px';
-                }
+        const showExecBtns = (event: any) => {
+            if (event.preventDefault) {
+                event.preventDefault();
             } else {
+                event.returnValue = false;
+            }
+            state.btnStyle.display = 'inline';
+            state.btnStyle.left = event.offsetX + 15 + 'px';
+            state.btnStyle.top = event.clientY - 80 + 'px';
+        };
+
+        /**
+         * 关闭执行sql和格式化按钮
+         */
+        const closeExecBtns = () => {
+            if (state.btnStyle.left) {
                 state.btnStyle.display = 'none';
                 state.btnStyle.left = '';
                 state.btnStyle.top = '';
             }
-        }, 100);
-
-        const listenMouse = (e: any) => {
-            getSelection(e);
         };
 
         return {
             ...toRefs(state),
-            cmEditor,
+            codeTextarea,
             changeProjectEnv,
-            inputRead,
             changeTable,
             cellClick,
             onRunSql,
@@ -918,6 +986,8 @@ export default defineComponent({
             execSqlFileSuccess,
             flexColumnWidth,
             getColumnTip,
+            getColumns4Map,
+            onConditionRowClick,
             changeSqlTemplate,
             deleteSql,
             saveSql,
@@ -925,7 +995,6 @@ export default defineComponent({
             clearDb,
             formatSql,
             onBeforeChange,
-            listenMouse,
             onRefresh,
             selectByCondition,
             onCommit,
@@ -933,15 +1002,26 @@ export default defineComponent({
             onDataSelectionChange,
             onDeleteData,
             onTableSortChange,
+            showExecBtns,
+            closeExecBtns,
         };
     },
 });
 </script>
 
 <style lang="scss">
-.codesql {
-    font-size: 9pt;
+.sqlEditor {
+    font-size: 8pt;
     font-weight: 600;
+    border: 1px solid #ccc;
+    .CodeMirror {
+        flex-grow: 1;
+        z-index: 1;
+        .CodeMirror-code {
+            line-height: 19px;
+        }
+        font-family: 'JetBrainsMono';
+    }
 }
 .el-tabs__header {
     padding: 0 10px;
