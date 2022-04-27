@@ -31,6 +31,7 @@ func InitDocRouter(router *gin.RouterGroup) {
 
 		db.POST("/upload", func(c *gin.Context) {
 			ctx.NewReqCtxWithGin(c).
+				WithNeedToken(false).
 				Handle(r.UploadDocImage)
 		})
 
