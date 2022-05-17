@@ -19,4 +19,8 @@ export const imports = {
     "RedisList": () => import('@/views/ops/redis'),
     "DataOperation": () => import('@/views/ops/redis/DataOperation.vue'),
     "MockDataList": () => import('@/views/mock-server'),
+    // mongo
+    "MongoDataOp": () => import('@/views/ops/mongo/MongoDataOp.vue'),
+    // redis
+    "MongoList": () => import('@/views/ops/mongo/MongoList.vue'),
 }
