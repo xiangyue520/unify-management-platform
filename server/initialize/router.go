@@ -1,6 +1,7 @@
 package initialize
 
 import (
+	"encoding/json"
 	"fmt"
 	"mayfly-go/base/config"
 	"mayfly-go/base/middleware"
@@ -52,7 +53,13 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
-		g.JSON(http.StatusOK, mockData.Data)
+		var res map[string]interface{}
+		err = json.Unmarshal([]byte(mockData.Data), &res)
+		if err != nil {
+			g.JSON(http.StatusOK, mockData.Data)
+		} else {
+			g.JSON(http.StatusOK, res)
+		}
 	})
 
 	// 设置静态资源
