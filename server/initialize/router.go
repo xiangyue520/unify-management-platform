@@ -56,7 +56,7 @@ func InitRouter() *gin.Engine {
 		var res map[string]interface{}
 		err = json.Unmarshal([]byte(mockData.Data), &res)
 		if err != nil {
-			g.JSON(http.StatusOK, mockData.Data)
+			g.String(http.StatusOK, mockData.Data)
 		} else {
 			g.JSON(http.StatusOK, res)
 		}
