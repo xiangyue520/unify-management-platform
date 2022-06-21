@@ -10,9 +10,11 @@ import (
 	"mayfly-go/pkg/config"
 	"mayfly-go/pkg/middleware"
 	"mayfly-go/pkg/model"
+	"mayfly-go/pkg/utils"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,10 +55,41 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
+		vars := make(map[string]map[string]interface{})
+
+		rowQuery := g.Request.URL.RawQuery
+		if rowQuery != "" {
+			queryMap := make(map[string]interface{})
+			pars := strings.Split(rowQuery, "&")
+			for _, par := range pars {
+				// 然后分解 sessionid=222222 和 token=3333
+				parkv := strings.Split(par, "=")
+				// 等号前面是key,后面是value
+				queryMap[parkv[0]] = parkv[1]
+			}
+			vars["query"] = queryMap
+		}
+
+		reqBody := make(map[string]interface{})
+		if strings.HasSuffix(g.ContentType(), "application/json") {
+			g.BindJSON(&reqBody)
+		} else {
+			g.Request.ParseMultipartForm(100000000)
+			postForm := g.Request.PostForm
+			if len(postForm) > 0 {
+				for k, v := range postForm {
+					reqBody[k] = v[0]
+				}
+			}
+		}
+		vars["body"] = reqBody
+
+		mockRes := utils.TemplateParse(mockData.Data, vars)
+
 		var res map[string]interface{}
-		err = json.Unmarshal([]byte(mockData.Data), &res)
+		err = json.Unmarshal([]byte(mockRes), &res)
 		if err != nil {
-			g.String(http.StatusOK, mockData.Data)
+			g.String(http.StatusOK, mockRes)
 		} else {
 			g.JSON(http.StatusOK, res)
 		}
