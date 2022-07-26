@@ -38,6 +38,7 @@ func (m *Mongo) Save(rc *ctx.ReqCtx) {
 
 	mongo := new(entity.Mongo)
 	utils.Copy(mongo, form)
+
 	mongo.SetBaseInfo(rc.LoginAccount)
 	m.MongoApp.Save(mongo)
 }

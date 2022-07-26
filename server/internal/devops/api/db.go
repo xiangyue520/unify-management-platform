@@ -47,12 +47,38 @@ func (d *Db) Save(rc *ctx.ReqCtx) {
 
 	db := new(entity.Db)
 	utils.Copy(db, form)
+
+	// 密码解密，并使用解密后的赋值
+	originPwd, err := utils.DefaultRsaDecrypt(form.Password, true)
+	biz.ErrIsNilAppendErr(err, "解密密码错误: %s")
+	db.Password = originPwd
+
 	// 密码脱敏记录日志
 	form.Password = "****"
 	rc.ReqParam = form
 
 	db.SetBaseInfo(rc.LoginAccount)
 	d.DbApp.Save(db)
+}
+
+// 获取数据库实例的所有数据库名
+func (d *Db) GetDatabaseNames(rc *ctx.ReqCtx) {
+	form := &form.DbForm{}
+	ginx.BindJsonAndValid(rc.GinCtx, form)
+
+	db := new(entity.Db)
+	utils.Copy(db, form)
+
+	// 密码解密，并使用解密后的赋值
+	originPwd, err := utils.DefaultRsaDecrypt(form.Password, true)
+	biz.ErrIsNilAppendErr(err, "解密密码错误: %s")
+	db.Password = originPwd
+
+	// 如果id不为空，并且密码为空则从数据库查询
+	if form.Id != 0 && db.Password == "" {
+		db = d.DbApp.GetById(form.Id)
+	}
+	rc.ResData = d.DbApp.GetDatabases(db)
 }
 
 func (d *Db) DeleteDb(rc *ctx.ReqCtx) {

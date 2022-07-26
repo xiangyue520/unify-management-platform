@@ -9,11 +9,14 @@ type DbForm struct {
 	Username  string `binding:"required" json:"username"`
 	Password  string `json:"password"`
 	Params    string `json:"params"`
-	Database  string `binding:"required" json:"database"`
+	Database  string `json:"database"`
 	ProjectId uint64 `binding:"required" json:"projectId"`
 	Project   string `json:"project"`
 	Env       string `json:"env"`
 	EnvId     uint64 `binding:"required" json:"envId"`
+
+	EnableSshTunnel    int8   `json:"enableSshTunnel"`
+	SshTunnelMachineId uint64 `json:"sshTunnelMachineId"`
 }
 
 type DbSqlSaveForm struct {

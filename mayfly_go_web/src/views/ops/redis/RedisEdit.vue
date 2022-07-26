@@ -1,6 +1,6 @@
 <template>
     <div>
-        <el-dialog :title="title" v-model="dialogVisible" :before-close="cancel" :close-on-click-modal="false" :destroy-on-close="true" width="35%">
+        <el-dialog :title="title" v-model="dialogVisible" :before-close="cancel" :close-on-click-modal="false" :destroy-on-close="true" width="38%">
             <el-form :model="form" ref="redisForm" :rules="rules" label-width="85px">
                 <el-form-item prop="projectId" label="项目:" required>
                     <el-select style="width: 100%" v-model="form.projectId" placeholder="请选择项目" @change="changeProject" filterable>
@@ -20,14 +20,19 @@
                     </el-select>
                 </el-form-item>
                 <el-form-item prop="host" label="host:" required>
-                    <el-input v-model.trim="form.host" placeholder="请输入host:port，集群模式用','分割" auto-complete="off" type="textarea"></el-input>
+                    <el-input
+                        v-model.trim="form.host"
+                        placeholder="请输入host:port，集群模式用','分割"
+                        auto-complete="off"
+                        type="textarea"
+                    ></el-input>
                 </el-form-item>
                 <el-form-item prop="password" label="密码:">
                     <el-input
                         type="password"
                         show-password
                         v-model.trim="form.password"
-                        placeholder="请输入密码"
+                        placeholder="请输入密码, 修改操作可不填"
                         autocomplete="new-password"
                     ></el-input>
                 </el-form-item>
@@ -37,12 +42,29 @@
                 <el-form-item prop="remark" label="备注:">
                     <el-input v-model.trim="form.remark" auto-complete="off" type="textarea"></el-input>
                 </el-form-item>
+                <el-form-item prop="enableSshTunnel" label="SSH隧道:">
+                    <el-col :span="3">
+                        <el-checkbox @change="getSshTunnelMachines" v-model="form.enableSshTunnel" :true-label="1" :false-label="-1"></el-checkbox>
+                    </el-col>
+                    <el-col :span="2" v-if="form.enableSshTunnel == 1"> 机器: </el-col>
+                    <el-col :span="19" v-if="form.enableSshTunnel == 1">
+                        <el-select style="width: 100%" v-model="form.sshTunnelMachineId" placeholder="请选择SSH隧道机器">
+                            <el-option
+                                v-for="item in sshTunnelMachineList"
+                                :key="item.id"
+                                :label="`${item.ip}:${item.port} [${item.name}]`"
+                                :value="item.id"
+                            >
+                            </el-option>
+                        </el-select>
+                    </el-col>
+                </el-form-item>
             </el-form>
 
             <template #footer>
                 <div class="dialog-footer">
                     <el-button @click="cancel()">取 消</el-button>
-                     <el-button type="primary" :loading="btnLoading" @click="btnOk">确 定</el-button>
+                    <el-button type="primary" :loading="btnLoading" @click="btnOk">确 定</el-button>
                 </div>
             </template>
         </el-dialog>
@@ -53,7 +75,9 @@
 import { toRefs, reactive, watch, defineComponent, ref } from 'vue';
 import { redisApi } from './api';
 import { projectApi } from '../project/api.ts';
+import { machineApi } from '../machine/api.ts';
 import { ElMessage } from 'element-plus';
+import { RsaEncrypt } from '@/common/rsa';
 
 export default defineComponent({
     name: 'RedisEdit',
@@ -77,17 +101,20 @@ export default defineComponent({
             dialogVisible: false,
             projects: [],
             envs: [],
+            sshTunnelMachineList: [],
             form: {
                 id: null,
                 name: null,
-                mode: "standalone",
+                mode: 'standalone',
                 host: null,
                 password: null,
                 project: null,
                 projectId: null,
                 envId: null,
                 env: null,
-                remark: "",
+                remark: '',
+                enableSshTunnel: null,
+                sshTunnelMachineId: null,
             },
             btnLoading: false,
             rules: {
@@ -131,15 +158,26 @@ export default defineComponent({
 
         watch(props, async (newValue) => {
             state.dialogVisible = newValue.visible;
+            if (!state.dialogVisible) {
+                return;
+            }
             state.projects = newValue.projects;
             if (newValue.redis) {
                 getEnvs(newValue.redis.projectId);
                 state.form = { ...newValue.redis };
             } else {
                 state.envs = [];
-                state.form = { db: 0 } as any;
+                state.form = { db: 0, enableSshTunnel: -1 } as any;
             }
+            getSshTunnelMachines();
         });
+
+        const getSshTunnelMachines = async () => {
+            if (state.form.enableSshTunnel == 1 && state.sshTunnelMachineList.length == 0) {
+                const res = await machineApi.list.request({ pageNum: 1, pageSize: 100 });
+                state.sshTunnelMachineList = res.list;
+            }
+        };
 
         const getEnvs = async (projectId: any) => {
             state.envs = await projectApi.projectEnvs.request({ projectId });
@@ -166,9 +204,11 @@ export default defineComponent({
         };
 
         const btnOk = async () => {
-            redisForm.value.validate((valid: boolean) => {
+            redisForm.value.validate(async (valid: boolean) => {
                 if (valid) {
-                    redisApi.saveRedis.request(state.form).then(() => {
+                    const reqForm = { ...state.form };
+                    reqForm.password = await RsaEncrypt(reqForm.password);
+                    redisApi.saveRedis.request(reqForm).then(() => {
                         ElMessage.success('保存成功');
                         emit('val-change', state.form);
                         state.btnLoading = true;
@@ -193,6 +233,7 @@ export default defineComponent({
         return {
             ...toRefs(state),
             redisForm,
+            getSshTunnelMachines,
             changeProject,
             changeEnv,
             btnOk,

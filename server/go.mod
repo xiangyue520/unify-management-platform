@@ -6,15 +6,16 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // jwt
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/lib/pq v1.10.6
 	github.com/mojocn/base64Captcha v1.3.5 // 验证码
-	github.com/pkg/sftp v1.13.4
+	github.com/pkg/sftp v1.13.5
 	github.com/robfig/cron/v3 v3.0.1 // 定时任务
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	go.mongodb.org/mongo-driver v1.9.1 // mongo
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // ssh
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // ssh
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	// gorm
 	gorm.io/driver/mysql v1.3.4
@@ -28,7 +29,6 @@ require (
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.1 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -52,7 +52,7 @@ require (
 	golang.org/x/image v0.0.0-20220302094943-723b81ca9867 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 // indirect
-	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
