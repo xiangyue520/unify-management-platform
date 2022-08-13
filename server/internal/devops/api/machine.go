@@ -72,6 +72,14 @@ func (m *Machine) SaveMachine(rc *ctx.ReqCtx) {
 	m.MachineApp.Save(me)
 }
 
+// 获取机器实例密码，由于数据库是加密存储，故提供该接口展示原文密码
+func (m *Machine) GetMachinePwd(rc *ctx.ReqCtx) {
+	mid := GetMachineId(rc.GinCtx)
+	me := m.MachineApp.GetById(mid, "Password")
+	me.PwdDecrypt()
+	rc.ResData = me.Password
+}
+
 func (m *Machine) ChangeStatus(rc *ctx.ReqCtx) {
 	g := rc.GinCtx
 	id := uint64(ginx.PathParamInt(g, "machineId"))
@@ -152,21 +160,16 @@ func (m *Machine) WsSSH(g *gin.Context) {
 		panic(biz.NewBizErr("\033[1;31m您没有权限操作该机器终端,请重新登录后再试~\033[0m"))
 	}
 
-	cols := ginx.QueryInt(g, "cols", 80)
-	rows := ginx.QueryInt(g, "rows", 40)
-
 	cli := m.MachineApp.GetCli(GetMachineId(g))
 	biz.ErrIsNilAppendErr(m.ProjectApp.CanAccess(rc.LoginAccount.Id, cli.GetMachine().ProjectId), "%s")
 
-	sws, err := machine.NewLogicSshWsSession(cols, rows, cli, wsConn)
-	biz.ErrIsNilAppendErr(err, "\033[1;31m连接失败：%s\033[0m")
-	defer sws.Close()
+	cols := ginx.QueryInt(g, "cols", 80)
+	rows := ginx.QueryInt(g, "rows", 40)
 
-	quitChan := make(chan bool, 3)
-	sws.Start(quitChan)
-	go sws.Wait(quitChan)
-
-	<-quitChan
+	mts, err := machine.NewTerminalSession(utils.RandString(16), wsConn, cli, rows, cols)
+	biz.ErrIsNilAppendErr(err, "\033[1;31m连接失败: %s\033[0m")
+	mts.Start()
+	defer mts.Stop()
 }
 
 func GetMachineId(g *gin.Context) uint64 {
