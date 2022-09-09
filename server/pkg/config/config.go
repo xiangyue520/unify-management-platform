@@ -16,15 +16,14 @@ func Init() {
 	flag.Parse()
 	// 获取启动参数中，配置文件的绝对路径
 	path, _ := filepath.Abs(*configFilePath)
-	startConfigParam := &CmdConfigParam{ConfigFilePath: path}
+	//startConfigParam := &CmdConfigParam{ConfigFilePath: path}
 	// 读取配置文件信息
-	yc := &Config{}
-	if err := utils.LoadYml(startConfigParam.ConfigFilePath, yc); err != nil {
-		panic(fmt.Sprintf("读取配置文件[%s]失败: %s", startConfigParam.ConfigFilePath, err.Error()))
+	Conf = &Config{}
+	if err := utils.LoadYml(path, Conf); err != nil {
+		panic(fmt.Sprintf("读取配置文件[%s]失败: %s", path, err.Error()))
 	}
 	// 校验配置文件内容信息
-	yc.Valid()
-	Conf = yc
+	Conf.Valid()
 }
 
 // 启动配置参数

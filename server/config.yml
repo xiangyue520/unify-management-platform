@@ -20,13 +20,13 @@ aes:
 mysql:
   host: localhost:3306
   username: root
-  password: 111049
+  password: 123456
   db-name: mayfly-go
   config: charset=utf8&loc=Local&parseTime=true
   max-idle-conns: 5
 log:
    # 日志等级, trace, debug, info, warn, error, fatal
-  level: info
-  # file:
-  #   path: ./
-  #   name: mayfly.log
+  level: debug
+  file:
+    path: /tmp/go
+    name: log.log

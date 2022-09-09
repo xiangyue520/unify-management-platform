@@ -75,6 +75,7 @@ func (p *projectAppImpl) ListProjectByIds(ids []uint64, toEntity interface{}, or
 
 func (p *projectAppImpl) SaveProject(project *entity.Project) {
 	if project.Id == 0 {
+		//todo admin应该自动有所有的项目权限
 		p.projectRepo.Save(project)
 	} else {
 		// 防止误传导致项目名更新

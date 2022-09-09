@@ -28,6 +28,7 @@ func InitProjectRouter(router *gin.RouterGroup) {
 		saveProjectLog := ctx.NewLogInfo("保存项目信息").WithSave(true)
 		savePP := ctx.NewPermission("project:save")
 		// 保存项目下的环境信息
+		//todo 创建的项目,在系统管理员下应该自动拥有
 		project.POST("", func(c *gin.Context) {
 			ctx.NewReqCtxWithGin(c).WithLog(saveProjectLog).
 				WithRequiredPermission(savePP).

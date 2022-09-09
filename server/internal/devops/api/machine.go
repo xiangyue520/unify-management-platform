@@ -108,7 +108,9 @@ func (m *Machine) CloseCli(rc *ctx.ReqCtx) {
 // 获取进程列表信息
 func (m *Machine) GetProcess(rc *ctx.ReqCtx) {
 	g := rc.GinCtx
-	cmd := "ps -aux "
+	//cmd := "ps -aux "
+	//mac下不支持-u
+	cmd := "ps -ax "
 	sortType := g.Query("sortType")
 	if sortType == "2" {
 		cmd += "--sort -pmem "
